@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Visualizzazione KNN 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="bg-white shadow p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-gray-800">KNN Algorithm Visualizer</h1>
+        <div class="flex items-center gap-4">
+            <div>
+                <label class="font-bold mr-2">Valore K:</label>
+                <input type="number" id="k-value" value="3" min="1" max="10" class="border p-1 w-16 rounded">
+            </div>
+            <a href="reset.php" class="text-red-500 text-sm hover:underline">Reset Dati</a>
+        </div>
+    </div>
+
+    <div class="flex-1 flex flex-col md:flex-row">
+        
+        <div id="plotDiv" class="flex-1 bg-white m-2 rounded shadow border"></div>
+
+        <div class="w-full md:w-80 bg-white m-2 p-4 rounded shadow border flex flex-col">
+            <h2 class="text-lg font-bold mb-4 border-b pb-2">Live Prediction</h2>
+            
+            <div id="prediction-box" class="bg-gray-100 p-4 rounded text-center mb-4">
+                <span class="text-sm text-gray-500">Classe Predetta:</span>
+                <div id="predicted-label" class="text-4xl font-bold text-gray-800">?</div>
+            </div>
+
+            <h3 class="font-bold text-sm mb-2">Vicini più prossimi (Nearest Neighbors):</h3>
+            <ul id="neighbors-list" class="text-sm space-y-2 overflow-y-auto flex-1">
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Configurazione Colori
+        const colors = {
+            'A': 'red',
+            'B': 'green',
+            'C': 'blue',
+            'unknown': 'black'
+        };
+
+        // Funzione per calcolare la distanza Euclidea
+        function getDistance(p1, p2) {
+            return Math.sqrt(
+                Math.pow(p1.x - p2.x, 2) + 
+                Math.pow(p1.y - p2.y, 2) + 
+                Math.pow(p1.z - p2.z, 2)
+            );
+        }
+
+        // Algoritmo KNN
+        function runKNN(trainingData, inputPoint, k) {
+            if (trainingData.length === 0) return null;
+
+            // 1. Calcola distanze
+            const distances = trainingData.map(point => {
+                return {
+                    point: point,
+                    dist: getDistance(point, inputPoint)
+                };
+            });
+
+            // 2. Ordina per distanza
+            distances.sort((a, b) => a.dist - b.dist);
+
+            // 3. Prendi i primi K
+            const neighbors = distances.slice(0, k);
+
+            // 4. Vota la classe più frequente
+            const votes = {};
+            neighbors.forEach(n => {
+                const label = n.point.label;
+                votes[label] = (votes[label] || 0) + 1;
+            });
+
+            const predictedLabel = Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
+            
+            return { predictedLabel, neighbors };
+        }
+
+        async function updateGraph() {
+            try {
+                const response = await fetch('fetch.php');
+                const data = await response.json();
+
+                // Separiamo i dati di training da quelli live (ultimo punto senza label)
+                const trainingData = data.filter(d => d.label !== null);
+                
+                const lastPoint = data[data.length - 1];
+                const isLiveMode = lastPoint && lastPoint.label === null;
+
+                // Preparazione tracce per Plotly
+                const traces = [];
+
+                // Tracce per le classi conosciute
+                ['A', 'B', 'C'].forEach(lbl => {
+                    const points = trainingData.filter(d => d.label === lbl);
+                    if (points.length > 0) {
+                        traces.push({
+                            x: points.map(p => p.x),
+                            y: points.map(p => p.y),
+                            z: points.map(p => p.z),
+                            mode: 'markers',
+                            type: 'scatter3d',
+                            name: `Classe ${lbl}`,
+                            marker: { color: colors[lbl], size: 5, opacity: 0.6 }
+                        });
+                    }
+                });
+
+                // Gestione del punto Live e KNN
+                if (isLiveMode) {
+                    const k = parseInt(document.getElementById('k-value').value);
+                    const result = runKNN(trainingData, lastPoint, k);
+
+                    if (result) {
+                        // Aggiorna UI
+                        const predEl = document.getElementById('predicted-label');
+                        predEl.innerText = result.predictedLabel;
+                        predEl.style.color = colors[result.predictedLabel];
+
+                        // Lista vicini
+                        const listEl = document.getElementById('neighbors-list');
+                        listEl.innerHTML = result.neighbors.map(n => 
+                            `<li class="p-2 border rounded flex justify-between items-center">
+                                <span class="w-3 h-3 rounded-full bg-${colors[n.point.label]}-600" style="background-color:${colors[n.point.label]}"></span>
+                                <span>Dist: ${n.dist.toFixed(2)}</span>
+                             </li>`
+                        ).join('');
+
+                        // Aggiungi punto live al grafico
+                        traces.push({
+                            x: [lastPoint.x],
+                            y: [lastPoint.y],
+                            z: [lastPoint.z],
+                            mode: 'markers',
+                            type: 'scatter3d',
+                            name: 'Dato Live',
+                            marker: { color: 'black', size: 10, symbol: 'circle-open' } // Cerchio vuoto o x
+                        });
+                        
+                        // Opzionale: Aggiungi linee verso i vicini
+                        result.neighbors.forEach(n => {
+                            traces.push({
+                                x: [lastPoint.x, n.point.x],
+                                y: [lastPoint.y, n.point.y],
+                                z: [lastPoint.z, n.point.z],
+                                type: 'scatter3d',
+                                mode: 'lines',
+                                showlegend: false,
+                                line: { color: 'gray', width: 2 }
+                            });
+                        });
+                    }
+                } else {
+                    document.getElementById('predicted-label').innerText = "...";
+                    document.getElementById('neighbors-list').innerHTML = "";
+                }
+
+                const layout = {
+                    margin: {l:0, r:0, b:0, t:0},
+                    scene: {
+                        xaxis: {title: 'Inclinazione X'},
+                        yaxis: {title: 'Inclinazione Y'},
+                        zaxis: {title: 'Rotazione Z'}
+                    }
+                };
+
+                Plotly.react('plotDiv', traces, layout);
+
+            } catch (e) {
+                console.error("Errore fetch:", e);
+            }
+        }
+
+        // Aggiorna ogni 500ms
+        setInterval(updateGraph, 500);
+        updateGraph();
+
+    </script>
+</body>
+</html>

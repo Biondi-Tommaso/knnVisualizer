@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensore KNN Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col items-center justify-center p-4">
+
+    <h1 class="text-2xl font-bold mb-6">Acquisizione Dati</h1>
+
+    <div class="w-full max-w-md bg-gray-800 p-6 rounded-lg shadow-lg">
+        <!-- Selezione Etichetta -->
+        <label class="block mb-2 text-sm font-bold text-gray-300">Etichetta (Classe)</label>
+        <div class="grid grid-cols-3 gap-2 mb-6">
+            <button onclick="setLabel('A')" id="btn-A" class="lbl-btn bg-red-600 p-3 rounded hover:opacity-80 transition">Rosso</button>
+            <button onclick="setLabel('B')" id="btn-B" class="lbl-btn bg-green-600 p-3 rounded hover:opacity-80 transition">Verde</button>
+            <button onclick="setLabel('C')" id="btn-C" class="lbl-btn bg-blue-600 p-3 rounded hover:opacity-80 transition">Blu</button>
+        </div>
+        
+        <button onclick="setLabel(null)" id="btn-Test" class="lbl-btn w-full bg-gray-600 p-3 rounded mb-6 border-2 border-white font-bold">MODALITÀ TEST (Nessuna Etichetta)</button>
+
+        <div class="text-center mb-4">
+            <p>Stato: <span id="status" class="text-yellow-400">In attesa...</span></p>
+            <p class="text-xs text-gray-400 mt-2">X: <span id="val-x">0</span> | Y: <span id="val-y">0</span> | Z: <span id="val-z">0</span></p>
+        </div>
+
+        <button id="btn-perm" onclick="requestPermission()" class="w-full bg-purple-600 py-3 rounded font-bold">Avvia Sensori</button>
+    </div>
+
+    <script>
+        let currentLabel = null; // Se null, siamo in modalità "predict"
+        let isSending = false;
+
+        function setLabel(label) {
+            currentLabel = label;
+            document.querySelectorAll('.lbl-btn').forEach(b => b.classList.remove('ring-4', 'ring-white'));
+            
+            if(label) {
+                document.getElementById(`btn-${label}`).classList.add('ring-4', 'ring-white');
+                document.getElementById('status').innerText = `Training: Classe ${label}`;
+            } else {
+                document.getElementById(`btn-Test`).classList.add('ring-4', 'ring-white');
+                document.getElementById('status').innerText = `Live Testing (KNN)`;
+            }
+        }
+
+        // iOS 13+ richiede permesso esplicito per i sensori
+        function requestPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            startSensors();
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                startSensors();
+            }
+            document.getElementById('btn-perm').style.display = 'none';
+        }
+
+        function startSensors() {
+            window.addEventListener('deviceorientation', handleOrientation);
+            isSending = true;
+        }
+
+        let lastSent = 0;
+        
+        function handleOrientation(event) {
+            const now = Date.now();
+            // Inviamo dati ogni 200ms per non intasare il server
+            if (now - lastSent < 200) return;
+            lastSent = now;
+
+            // Dati grezzi (Alpha, Beta, Gamma)
+            const x = event.beta || 0;  // Inclinazione fronte/retro
+            const y = event.gamma || 0; // Inclinazione sinistra/destra
+            const z = event.alpha || 0; // Bussola (non sempre affidabile ma usiamola per il 3D)
+
+            document.getElementById('val-x').innerText = x.toFixed(1);
+            document.getElementById('val-y').innerText = y.toFixed(1);
+            document.getElementById('val-z').innerText = z.toFixed(1);
+
+            const payload = {
+                x: x,
+                y: y,
+                z: z,
+                label: currentLabel, // Può essere 'A', 'B', 'C' o null
+                timestamp: now
+            };
+
+            fetch('save.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            }).catch(err => console.error(err));
+        }
+    </script>
+</body>
+</html>
