@@ -1,0 +1,5 @@
+Leggere la documentazione in "Materiale attivita"
+In breve:
+    cd public/ && php -S localhost:8000
+
+Oppure usa XAMMP o il sito https://templatemanager.altervista.org/knnVisualizer/desktop.html
