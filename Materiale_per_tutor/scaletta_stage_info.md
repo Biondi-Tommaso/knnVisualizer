@@ -1,5 +1,7 @@
 ## Cos’è il Machine Learning?
-> Il Machine Learning è un campo di studio dell'informatica che si occupa dello sviluppo e dello studio di algoritmi statistici in grado di apprendere dai dati e generalizzare su dati non visti, eseguendo così compiti senza istruzioni esplicite.
+> **Programma classico**: esecuzione diretta di una serie di istruzioni, come un ragazzo che segue una ricetta di cucina.
+
+> **Programma ML**: costruisce un modello in base a dati e statistiche, riesce a risolvere, con un certo grado di errore, problemi mai visti, adattandosi. Un pò come la nonna che ha seguito ricette per anni e ora è capace di cucinare senza.
 
 <img src="https://c.mql5.com/2/50/Knn_Article_image.png" height=200>
 
@@ -12,6 +14,8 @@ Ormai quasi ovunque: raccomandazioni video, filtri anti‑spam, traduzioni autom
 **Esempio quotidiano:** il filtro anti‑spam della tua email : il modello analizza parole chiave, mittente, struttura del messaggio e decide se è spam o no.
 
 **Pensiero chiave:** l’AI non è magia: è basata su regole statistiche che possiamo spiegare.
+
+> Ma può diventarlo facilmente, ad esempio con le Reti neurali convoluzionali
 
 ---
 
