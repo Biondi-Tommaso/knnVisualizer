@@ -3,71 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Piano cartesiano – punti positivi</title>
-
-  <!-- Tailwind CSS (CDN) -->
+  <title>KNN Visualizer - Piano Cartesiano</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
   <style>
     #graphCanvas {
-      background-color:#fff;
-      border:1px solid #d1d5db;   /* gray‑300 */
+      background-color: #fff;
+      border: 1px solid #d1d5db;
+      cursor: crosshair;
+    }
+    /* Classe per nascondere elementi con transizione */
+    .hidden-panel {
+      display: none;
     }
   </style>
 </head>
 
-<body class="flex min-h-screen">
+<body class="flex min-h-screen font-sans text-gray-800">
 
-  <!-- ──────────────────────  MAIN CONTAINER  ────────────────────── -->
-  <div class="flex flex-1">
+  <aside class="w-80 p-6 bg-white border-r border-gray-200 flex flex-col gap-6 shadow-lg z-10">
+    
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-1">KNN Visualizer</h1>
+      <p class="text-xs text-gray-500">K-Nearest Neighbors Algorithm</p>
+    </div>
 
-    <!-- ──────────────────────  LEFT PANEL (form & table)  ────────────────────── -->
-    <aside class="w-80 p-6 bg-gray-100 border-r border-gray-200 flex flex-col gap-4">
-      <h1 class="text-xl font-semibold">Aggiungi punto</h1>
+    <div class="bg-gray-100 p-4 rounded-lg border border-gray-200">
+      <label class="flex items-center cursor-pointer gap-3">
+        <div class="relative">
+          <input type="checkbox" id="modeToggle" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+        </div>
+        <span class="text-sm font-medium text-gray-900" id="modeLabel">Modalità Inserimento</span>
+      </label>
+      <p class="text-xs text-gray-500 mt-2" id="modeDescription">
+        Scegli tu il colore dei punti per creare il dataset.
+      </p>
+    </div>
 
-      <form id="pointForm" class="grid gap-2">
-        <input type="number" step="any" id="xInput" placeholder="X (≥0)" min="0" required
-               class="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <input type="number" step="any" id="yInput" placeholder="Y (≥0)" min="0" required
-               class="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <form id="pointForm" class="flex flex-col gap-4">
+      
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">X (0-10)</label>
+          <input type="number" step="any" id="xInput" placeholder="0" min="0" max="10" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Y (0-10)</label>
+          <input type="number" step="any" id="yInput" placeholder="0" min="0" max="10" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors">
+        </div>
+      </div>
 
-        <!-- Scelta colore -->
-        <label class="block text-sm font-medium text-gray-700">Colore del punto</label>
-        <input type="color" id="colorPicker" value="#ef4444"
-               class="w-full h-10 p-0 border rounded cursor-pointer">
+      <div id="manualColorSection">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Colore Classe</label>
+        <div class="flex gap-2 h-10">
+          <input type="color" id="colorPicker" value="#ef4444"
+                 class="h-full flex-1 p-0 border-0 rounded cursor-pointer shadow-sm">
+        </div>
+      </div>
 
-        <button type="submit"
-                class="w-full mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
-          Aggiungi
-        </button>
-      </form>
-      <button id="avvia_knn_btn" class="w-full mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-blue-700 transition">
-          Avvia KNN
+      <div id="kSection" class="hidden-panel">
+        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Valore di K (Vicini)</label>
+        <input type="number" id="kInput" value="3" min="1" max="10"
+               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <p class="text-xs text-gray-400 mt-1">Numero di vicini da consultare.</p>
+      </div>
+
+      <button type="submit" id="actionBtn"
+              class="w-full py-2.5 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-900 transition-all shadow-md mt-2">
+        Aggiungi Punto
       </button>
-      <hr class="my-2">
 
-      <h2 hidden class="text-lg font-medium">Punti inseriti</h2>
-      <table hidden class="min-w-full text-sm border-collapse">
-        <thead class="bg-gray-200">
-          <tr>
-            <th class="px-2 py-1 text-left">#</th>
-            <th class="px-2 py-1 text-left">X</th>
-            <th class="px-2 py-1 text-left">Y</th>
-            <th class="px-2 py-1 text-left">Colore</th>
-            <th class="px-2 py-1 text-left">Azioni</th>
-          </tr>
-        </thead>
-        <tbody id="pointsTableBody" class="bg-white"></tbody>
-      </table>
-    </aside>
+    </form>
 
-    <!-- ──────────────────────  RIGHT PANEL (canvas)  ────────────────────── -->
-    <main class="flex-1 flex items-center justify-center p-6 overflow-auto">
-      <canvas id="graphCanvas" width="600" height="600"></canvas>
-    </main>
-  </div>
+    <div class="mt-auto pt-4 border-t border-gray-200">
+      <button onclick="clearAll()" class="text-xs text-red-500 hover:text-red-700 underline">
+        Reset Grafico
+      </button>
+    </div>
+  </aside>
 
-  <!-- JavaScript esterno -->
+  <main class="flex-1 bg-gray-50 flex items-center justify-center p-8 overflow-hidden relative">
+    <canvas id="graphCanvas" width="600" height="600" class="shadow-xl rounded-lg"></canvas>
+  </main>
+
   <script src="engine.js"></script>
 </body>
 </html>

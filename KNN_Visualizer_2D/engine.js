@@ -1,131 +1,197 @@
 /* --------------------------------------------------------------
-   Configurazione del piano cartesiano (solo valori positivi)
+   Configurazione
    -------------------------------------------------------------- */
 const canvas = document.getElementById('graphCanvas');
 const ctx = canvas.getContext('2d');
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
+const MAX_VALUE = 10;
+const SCALE = WIDTH / (MAX_VALUE + 1);
 
-/* 0 … MAX_VALUE su entrambi gli assi (solo positivo) */
-const MAX_VALUE = 10;                     // puoi modificarlo a piacere
-const SCALE = WIDTH / (MAX_VALUE + 1);    // pixel per unità (lascia margine)
+/* Stato dell'applicazione */
+let points = [];
+let isPredictionMode = false;
 
+/* Elementi DOM */
+const form = document.getElementById('pointForm');
+const xInput = document.getElementById('xInput');
+const yInput = document.getElementById('yInput');
+const colorPicker = document.getElementById('colorPicker');
+const modeToggle = document.getElementById('modeToggle');
+const modeLabel = document.getElementById('modeLabel');
+const modeDescription = document.getElementById('modeDescription');
+const manualColorSection = document.getElementById('manualColorSection');
+const kSection = document.getElementById('kSection');
+const kInput = document.getElementById('kInput');
+const actionBtn = document.getElementById('actionBtn');
 
 /* --------------------------------------------------------------
-   Funzioni di disegno
+   Disegno (Canvas)
    -------------------------------------------------------------- */
 function clearCanvas() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 }
 
-/* Disegna gli assi X e Y (solo dal 0 al MAX_VALUE) */
 function drawAxes() {
   ctx.save();
-  ctx.strokeStyle = '#4b5563';   // gray‑700
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#e5e7eb'; // griglia leggera
+  ctx.lineWidth = 1;
 
-  // Asse X (da 0 a MAX_VALUE)
-  ctx.beginPath();
-  ctx.moveTo(SCALE, HEIGHT - SCALE);
-  ctx.lineTo(WIDTH - SCALE, HEIGHT - SCALE);
-  ctx.stroke();
-
-  // Asse Y (da 0 a MAX_VALUE)
-  ctx.beginPath();
-  ctx.moveTo(SCALE, HEIGHT - SCALE);
-  ctx.lineTo(SCALE, SCALE);
-  ctx.stroke();
-
-  // Ticks e numeri
-  ctx.fillStyle = '#4b5563';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-
+  // Griglia
   for (let i = 0; i <= MAX_VALUE; i++) {
-    // Tick X
-    const x = SCALE + i * SCALE;
-    ctx.beginPath();
-    ctx.moveTo(x, HEIGHT - SCALE - 5);
-    ctx.lineTo(x, HEIGHT - SCALE + 5);
-    ctx.stroke();
-    ctx.fillText(i, x, HEIGHT - SCALE + 8);
+    const pos = SCALE + i * SCALE;
+    // Verticale
+    ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, HEIGHT); ctx.stroke();
+    // Orizzontale
+    ctx.beginPath(); ctx.moveTo(0, HEIGHT - pos); ctx.lineTo(WIDTH, HEIGHT - pos); ctx.stroke();
+  }
 
-    // Tick Y
+  // Assi principali
+  ctx.strokeStyle = '#374151';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(SCALE, 0); ctx.lineTo(SCALE, HEIGHT); ctx.stroke(); // Y
+  ctx.beginPath(); ctx.moveTo(0, HEIGHT - SCALE); ctx.lineTo(WIDTH, HEIGHT - SCALE); ctx.stroke(); // X
+
+  // Numeri
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  for (let i = 0; i <= MAX_VALUE; i++) {
+    const x = SCALE + i * SCALE;
     const y = HEIGHT - SCALE - i * SCALE;
-    ctx.beginPath();
-    ctx.moveTo(SCALE - 5, y);
-    ctx.lineTo(SCALE + 5, y);
-    ctx.stroke();
-    ctx.fillText(i, SCALE - 12, y - 4);
+    // Label X
+    ctx.fillText(i, x, HEIGHT - SCALE + 20);
+    // Label Y
+    if(i > 0) ctx.fillText(i, SCALE - 20, y);
   }
   ctx.restore();
 }
 
-/* Disegna tutti i punti memorizzati */
-function drawPoint(p) {
+function drawPoint(p, isNew = false) {
   ctx.save();
   const cx = SCALE + p.x * SCALE;
   const cy = HEIGHT - SCALE - p.y * SCALE;
+  
   ctx.fillStyle = p.color;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  
   ctx.beginPath();
-  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  // Se è un punto appena aggiunto, lo facciamo leggermente più grande
+  const radius = isNew ? 9 : 6;
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
+function drawConnectionLine(startP, endP) {
+  ctx.save();
+  ctx.strokeStyle = '#6366f1'; // Indaco
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]); // Linea tratteggiata
+
+  const startX = SCALE + startP.x * SCALE;
+  const startY = HEIGHT - SCALE - startP.y * SCALE;
+  const endX = SCALE + endP.x * SCALE;
+  const endY = HEIGHT - SCALE - endP.y * SCALE;
+
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function redrawAll() {
+  clearCanvas();
+  drawAxes();
+  points.forEach(p => drawPoint(p));
+}
 
 /* --------------------------------------------------------------
-   Gestione del form
+   Logica KNN
    -------------------------------------------------------------- */
-const form = document.getElementById('pointForm');
-const xInput = document.getElementById('xInput');
-const yInput = document.getElementById('yInput');
-const colorPicker = document.getElementById('colorPicker');
-const avvia_knn_button = document.getElementById('avvia_knn_btn');
-
-function knn(points, new_point_x, new_point_y) {
-    let distances = [];
+function runKnn(newX, newY, k) {
+    // 1. Calcola distanze
+    let distances = points.map(p => {
+        return {
+            point: p,
+            dist: Math.hypot(p.x - newX, p.y - newY)
+        };
+    });
     
-    // Calculate distances
-    for (let i = 0; i < points.length; i++) {
-        let dist = Math.hypot(points[i].x - new_point_x, points[i].y - new_point_y);
-        distances.push({ color: points[i].color, dist: dist });
-    }
-    
-    // Sort by distance
+    // 2. Ordina per distanza crescente
     distances.sort((a, b) => a.dist - b.dist);
     
-    // Count color frequencies for the 3 nearest neighbors
-    let colorCount = {};
-    for (let i = 0; i < 3 && i < distances.length; i++) {
-        console.log(distances[i]);
-        let color = distances[i].color;
-        colorCount[color] = (colorCount[color] || 0) + 1;
-    }
+    // 3. Prendi i primi K vicini
+    // Assicuriamoci di non chiedere più vicini di quanti punti esistono
+    const kValid = Math.min(k, points.length);
+    const nearest = distances.slice(0, kValid);
     
-    // Find the color with the highest count
-    let predictedColor = null;
-    let maxCount = 0;
-    for (let color in colorCount) {
-        if (colorCount[color] > maxCount) {
-            maxCount = colorCount[color];
-            predictedColor = color;
+    // 4. Disegna le linee verso i vicini
+    nearest.forEach(neighbor => {
+        drawConnectionLine({x: newX, y: newY}, neighbor.point);
+    });
+
+    // 5. Votazione (Majority Vote)
+    let colorCount = {};
+    nearest.forEach(n => {
+        let c = n.point.color;
+        colorCount[c] = (colorCount[c] || 0) + 1;
+    });
+
+    let predictedColor = '#000000'; // Default se qualcosa va storto
+    let maxCount = -1;
+
+    for (let c in colorCount) {
+        if (colorCount[c] > maxCount) {
+            maxCount = colorCount[c];
+            predictedColor = c;
         }
     }
-    
+
     return predictedColor;
 }
 
+/* --------------------------------------------------------------
+   Gestione Eventi UI
+   -------------------------------------------------------------- */
 
+// Cambio Modalità
+modeToggle.addEventListener('change', (e) => {
+  isPredictionMode = e.target.checked;
 
-use_knn_for_color = false;
-points = [];
+  if (isPredictionMode) {
+    // UI: Attiva Modalità KNN
+    modeLabel.textContent = "Modalità Predizione (AI)";
+    modeLabel.classList.add("text-indigo-600");
+    modeDescription.textContent = "L'algoritmo decide il colore in base ai vicini.";
+    
+    manualColorSection.classList.add('hidden-panel');
+    kSection.classList.remove('hidden-panel');
+    
+    actionBtn.textContent = "Predici e Aggiungi";
+    actionBtn.classList.remove('bg-gray-800', 'hover:bg-gray-900');
+    actionBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+  } else {
+    // UI: Attiva Modalità Manuale
+    modeLabel.textContent = "Modalità Inserimento";
+    modeLabel.classList.remove("text-indigo-600");
+    modeDescription.textContent = "Scegli tu il colore dei punti per creare il dataset.";
 
-avvia_knn_button.addEventListener("click", evt => {
-  use_knn_for_color = true;
+    manualColorSection.classList.remove('hidden-panel');
+    kSection.classList.add('hidden-panel');
+
+    actionBtn.textContent = "Aggiungi Punto";
+    actionBtn.classList.add('bg-gray-800', 'hover:bg-gray-900');
+    actionBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+  }
 });
 
+// Submit Form
 form.addEventListener('submit', e => {
   e.preventDefault();
 
@@ -133,30 +199,41 @@ form.addEventListener('submit', e => {
   const y = parseFloat(yInput.value);
   let color = colorPicker.value;
 
-  // Controlli di validità (solo valori positivi e dentro il range)
-  if (x < 0 || y < 0) {
-    alert('Inserisci solo valori ≥ 0.');
-    return;
-  }
-  if (x > MAX_VALUE || y > MAX_VALUE) {
-    alert(`Il valore massimo consentito è ${MAX_VALUE}.`);
+  // Validazione
+  if (x < 0 || y < 0 || x > MAX_VALUE || y > MAX_VALUE) {
+    alert(`Inserisci valori tra 0 e ${MAX_VALUE}.`);
     return;
   }
 
-  if(use_knn_for_color){
-    color = knn(points, x, y);
-    console.log(color);
+  // Se siamo in modalità Predizione, calcoliamo il colore
+  if (isPredictionMode) {
+      if(points.length === 0) {
+          alert("Inserisci almeno un punto manualmente prima di usare l'AI!");
+          return;
+      }
+      const k = parseInt(kInput.value) || 3;
+      // Nota: runKnn disegna anche le linee
+      color = runKnn(x, y, k);
   }
-  point = { x, y, color };
-  points.push(point);
+
+  // Creazione e salvataggio punto
+  const newPoint = { x, y, color };
+  points.push(newPoint);
   
-  drawPoint(point);
+  // Disegniamo il punto sopra le linee
+  drawPoint(newPoint, true);
 
-  // Reset campi
+  // Reset Input (ma non colore in modalità manuale, comodo per inserirne tanti uguali)
   xInput.value = '';
   yInput.value = '';
   xInput.focus();
 });
 
-clearCanvas();
-drawAxes();
+// Funzione reset globale
+function clearAll() {
+    points = [];
+    redrawAll();
+}
+
+// Avvio
+redrawAll();
