@@ -66,4 +66,4 @@ Ormai quasi ovunque: raccomandazioni video, filtri anti‑spam, traduzioni autom
 | **Sistemi di raccomandazione** | Suggerire prodotti simili a quelli già acquistati da utenti con gusti analoghi. |
 
 
-*Grazie per l’attenzione!* 🚀
+*Grazie per l’attenzione!*
