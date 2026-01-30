@@ -56,7 +56,7 @@ Ormai quasi ovunque: raccomandazioni video, filtri anti‑spam, traduzioni autom
 
 ---
 
-## Slide 5 – Dove troviamo KNN nella vita reale?
+## Dove troviamo KNN nella vita reale?
 > Se abbiamo 12 sensori invece che due, nulla ci vieta di usare tutte e 12 le misure. Non potremo visualizzarle in un grafico tutte insieme ma il calcolo della distanza resta fattibile e l'algoritmo funziona.
 
 | Settore            | Applicazione concreta                                                                 |
