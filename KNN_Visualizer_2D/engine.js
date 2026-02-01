@@ -25,6 +25,8 @@ const kSection = document.getElementById('kSection');
 const kInput = document.getElementById('kInput');
 const actionBtn = document.getElementById('actionBtn');
 
+
+var multiple_points_add = false;
 /* --------------------------------------------------------------
    Disegno (Canvas)
    -------------------------------------------------------------- */
@@ -156,6 +158,13 @@ function runKnn(newX, newY, k) {
     return predictedColor;
 }
 
+function toggle_multiple_points_add() {
+  multiple_points_add = !multiple_points_add;
+  document.getElementById("auto-points-container").toggleAttribute("hidden");
+  xInput.toggleAttribute("required");
+  yInput.toggleAttribute("required");
+}
+
 /* --------------------------------------------------------------
    Gestione Eventi UI
    -------------------------------------------------------------- */
@@ -191,9 +200,35 @@ modeToggle.addEventListener('change', (e) => {
   }
 });
 
+
+
 // Submit Form
 form.addEventListener('submit', e => {
   e.preventDefault();
+
+  if(multiple_points_add){
+    let textarea = document.getElementById("auto-points-area");
+    const newpoints = textarea.value
+      .trim()                     // Remove leading/trailing whitespace
+      .split('\n')                // Split into separate lines
+      .map(line => line.trim())   // Clean each line
+      .filter(line => line)       // Discard any empty lines
+      .map(line => {
+        const [xStr, yStr] = line.split(/\s+/); // Split on one-or-more spaces/tabs
+        return {
+          x: Number(xStr),        // Convert to number (you could also use parseInt)
+          y: Number(yStr),
+          color: colorPicker.value
+        };
+      });
+
+    // ── Iterate over each point ──
+    for (const point of newpoints) {
+      points.push(point);
+      drawPoint(point, true);
+    }
+    return;
+  }
 
   const x = parseFloat(xInput.value);
   const y = parseFloat(yInput.value);
